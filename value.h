@@ -5,7 +5,7 @@
 // include the standard libraries
 #include "common.h"
 
-// Integers, decimals, ... (values) will be floating-points
+// Integers and decimals (values currently) will be floating-points
 typedef double Value;
 
 typedef struct {
@@ -14,6 +14,7 @@ typedef struct {
     Value* values; // Pointer to an array of stored values
 } ValueArray;
 
+// Declaring functions for managing the ValueArray
 void initValueArray(ValueArray* array);
 void writeValueArray(ValueArray* array, Value value);
 void freeValueArray(ValueArray* array);
