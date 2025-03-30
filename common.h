@@ -9,5 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define DEBUG_TRACE_EXECUTION
+
 // #pragma once (might be better to use instead of #endif but might not work with all compilers)
 #endif                // Ends the include/macro guard
