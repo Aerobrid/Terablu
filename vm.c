@@ -68,10 +68,26 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
-            case OP_ADD:      BINARY_OP(+); break;
-            case OP_SUBTRACT: BINARY_OP(-); break;
-            case OP_MULTIPLY: BINARY_OP(*); break;
-            case OP_DIVIDE:   BINARY_OP(/); break;
+            case OP_ADD: {
+                *(vm.stackTop - 2) += *(vm.stackTop - 1);
+                vm.stackTop--;
+                break;
+            }
+            case OP_SUBTRACT: {
+                *(vm.stackTop - 2) -= *(vm.stackTop - 1);
+                vm.stackTop--;
+                break;
+            }
+            case OP_MULTIPLY: {
+                *(vm.stackTop - 2) *= *(vm.stackTop - 1);
+                vm.stackTop--;
+                break;
+            }
+            case OP_DIVIDE: {
+                *(vm.stackTop - 2) /= *(vm.stackTop - 1);
+                vm.stackTop--;
+                break;
+            }            
             case OP_MODULUS: {  
                 Value b = pop();
                 Value a = pop();
@@ -89,7 +105,10 @@ static InterpretResult run() {
                 }
                 break;
             }                 
-            case OP_NEGATE:   push(-pop()); break;
+            case OP_NEGATE: {
+                *(vm.stackTop - 1) = -(*(vm.stackTop - 1)); // Directly negate the top value
+                break;
+            }            
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");
