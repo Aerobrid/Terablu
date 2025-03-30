@@ -2,7 +2,6 @@
 #include "debug.h"
 #include "vm.h"
 #include <stdio.h>
-#include <math.h>
 
 // global instance makes it easier to manage, not necessarily the best implementation when compared to a VM pointer
 VM vm; 
