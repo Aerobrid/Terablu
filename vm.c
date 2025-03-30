@@ -1,34 +1,49 @@
 #include "common.h"
 #include "debug.h"
 #include "vm.h"
+#include "memory.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 // global instance makes it easier to manage, not necessarily the best implementation when compared to a VM pointer
 VM vm; 
 
-// resets stackTop, is a helper function
-// points to beginning of array
 static void resetStack() {
-    vm.stackTop = vm.stack;
+    vm.stackCount = 0;
+    if (vm.stack == NULL) { 
+        vm.stackCapacity = 8; // Initial capacity of VM Stack
+        vm.stack = (Value*)malloc(vm.stackCapacity * sizeof(Value));
+    }
 }
 
 void initVM() {
+    vm.stack = NULL;
+    vm.stackCapacity = 0;
     resetStack();
 }
 
 void freeVM() {
+    free(vm.stack);
+    vm.stack = NULL;                // Prevents dangling pointers
+    vm.stackCapacity = 0;
+    resetStack();
 }
 
-// adds value to where top of stack is, then moves top to where the next value to be pushed will go
+// adds value to where count is, then moves count to where the next value to be pushed will go
 void push(Value value) {
-    *vm.stackTop = value;
-    vm.stackTop++;
+    if (vm.stackCapacity < vm.stackCount + 1) {
+      int oldCapacity = vm.stackCapacity;
+      vm.stackCapacity = GROW_CAPACITY(oldCapacity);
+      vm.stack = GROW_ARRAY(Value, vm.stack, oldCapacity, vm.stackCapacity);
+    }
+  
+    vm.stack[vm.stackCount] = value;
+    vm.stackCount++;
 }
-
-// move top to last used slot in stack (by decrementing, remember that current top is empty), then return the value
+// move count to last used slot in stack, then return the value
 Value pop() {
-    vm.stackTop--;
-    return *vm.stackTop;
+    vm.stackCount--;
+    return vm.stack[vm.stackCount];
 }
 
 static InterpretResult run() {
@@ -48,7 +63,7 @@ static InterpretResult run() {
     // For VM disassembly and stack tracing (looks at stack internally for better debugs)
     #ifdef DEBUG_TRACE_EXECUTION
         printf("          ");
-        for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
+        for (Value *slot = vm.stack; slot < vm.stack + vm.stackCount; slot++) {
             printf("[ ");
             printValue(*slot);
             printf(" ]");
@@ -68,26 +83,23 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
-            case OP_ADD: {
-                *(vm.stackTop - 2) += *(vm.stackTop - 1);
-                vm.stackTop--;
-                break;
-            }
-            case OP_SUBTRACT: {
-                *(vm.stackTop - 2) -= *(vm.stackTop - 1);
-                vm.stackTop--;
-                break;
-            }
-            case OP_MULTIPLY: {
-                *(vm.stackTop - 2) *= *(vm.stackTop - 1);
-                vm.stackTop--;
-                break;
-            }
+            case OP_ADD:      BINARY_OP(+); break;
+            case OP_SUBTRACT: BINARY_OP(-); break;
+            case OP_MULTIPLY: BINARY_OP(*); break;
             case OP_DIVIDE: {
-                *(vm.stackTop - 2) /= *(vm.stackTop - 1);
-                vm.stackTop--;
+                double b = pop();
+                double a = pop();
+                if (b == 0) {
+                    printf("Runtime Error: Division by zero.\n");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(a / b);
                 break;
-            }            
+            }
+            case OP_NEGATE: {
+                vm.stack[vm.stackCount - 1] = -vm.stack[vm.stackCount - 1];
+                break;
+            }           
             case OP_MODULUS: {  
                 Value b = pop();
                 Value a = pop();
@@ -96,19 +108,14 @@ static InterpretResult run() {
                     printf("Runtime Error: Modulo by zero.\n");
                     return INTERPRET_RUNTIME_ERROR;
                 }
-            
-                if ((a == (int)a) && (b == (int)b)) {  // Ensure both are integers
-                    push((int)a % (int)b);  // Perform integer modulus
+                if ((a == (int)a) && (b == (int)b)) {   // Ensure both are integers
+                    push((int)a % (int)b);              // Perform integer modulus
                 } else {
                     printf("Runtime Error: Modulo requires integer operands.\n");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
-            }                 
-            case OP_NEGATE: {
-                *(vm.stackTop - 1) = -(*(vm.stackTop - 1)); // Directly negate the top value
-                break;
-            }            
+            }                          
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");

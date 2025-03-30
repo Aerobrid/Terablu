@@ -16,8 +16,9 @@
 typedef struct {
     Chunk* chunk;                               // Stores a pointer to the chunk of bytecode that the VM will execute.
     uint8_t* ip;                                // Instruction pointer that tracks the position in the bytecode.
-    Value stack[STACK_MAX];                     // A fixed-size stack for storing temporary values.
-    Value* stackTop;                            // Points to the top of the stack, simplifying push/pop operations.
+    Value* stack;                               // VM Dynamic Stack
+    int stackCount;                             // Current element count within VM stack
+    int stackCapacity;                          // Total capacity of VM stack
 } VM;
 
 // The VM runs the chunk and then responds with a value from this enum:
