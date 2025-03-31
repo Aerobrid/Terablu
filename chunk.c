@@ -74,16 +74,16 @@ int addConstant(Chunk* chunk, Value value) {
 }
 
 void writeConstant(Chunk* chunk, Value value, int line) {
-    int constant = addConstant(chunk, value);
+    int index = addConstant(chunk, value);
     
-    if (constant < 256) { // Fits in one byte
+    if (index < 256) { // Fits in one byte
         writeChunk(chunk, OP_CONSTANT, line);
-        writeChunk(chunk, (uint8_t)constant, line);
+        writeChunk(chunk, (uint8_t)index, line);
     } else { // Needs 3 bytes (24-bit index)
         writeChunk(chunk, OP_CONSTANT_LONG, line);
         // Uses bitwise operations 
-        writeChunk(chunk, (uint8_t)(constant & 0xFF), line);        // Lower byte
-        writeChunk(chunk, (uint8_t)((constant >> 8) & 0xFF), line); // Middle byte
-        writeChunk(chunk, (uint8_t)((constant >> 16) & 0xFF), line); // Upper byte
+        writeChunk(chunk, (uint8_t)(index & 0xFF), line);        // Lower byte
+        writeChunk(chunk, (uint8_t)((index >> 8) & 0xFF), line); // Middle byte
+        writeChunk(chunk, (uint8_t)((index >> 16) & 0xFF), line); // Upper byte
     }
 }
