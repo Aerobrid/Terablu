@@ -32,7 +32,7 @@ typedef enum {
 // Declare VM functions
 void initVM();
 void freeVM();
-InterpretResult interpret(Chunk* chunk);       // Runs the bytecode stored in the chunk
+InterpretResult interpret(const char* source);      // Pass in a string of source code now
 void push(Value value);
 Value pop();
 
