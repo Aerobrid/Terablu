@@ -1,3 +1,4 @@
+// Include guard
 #ifndef clox_scanner_h
 #define clox_scanner_h
 
@@ -14,23 +15,25 @@ typedef enum {
     TOKEN_LESS, TOKEN_LESS_EQUAL,
     // Literals.
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
-    // Keywords.
+    // Reserved Keywords.
     TOKEN_AND, TOKEN_CLASS, TOKEN_ELSE, TOKEN_FALSE,
     TOKEN_FOR, TOKEN_FUN, TOKEN_IF, TOKEN_NIL, TOKEN_OR,
     TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER, TOKEN_THIS,
     TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
-  
+    // TOKEN_ERROR = Invalid token, TOKEN_EOF = Marks end of file (used to terminate scanning)
     TOKEN_ERROR, TOKEN_EOF
 } TokenType;
 
 typedef struct {
-    TokenType type;
-    const char* start;
-    int length;
-    int line;
+    TokenType type;                 // Specifies token type
+    const char* start;              // Points to the first character of the token in the source code 
+    int length;                     // The token's length
+    int line;                       // Source Code Line # of token (useful for error reporting, ex: Syntax Error on line 23 )
 } Token;
 
-void initScanner(const char* source);
-Token scanToken();
+// Scanner functions
+void initScanner(const char* source);   
+Token scanToken();                      
 
+// End include guard
 #endif

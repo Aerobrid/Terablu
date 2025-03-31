@@ -5,47 +5,53 @@
 #include "scanner.h"
 
 typedef struct {
-    const char* start;
-    const char* current;
-    int line;
+    const char* start;          // Beginning of current token
+    const char* current;        // Current position in source code
+    int line;                   // track current line #
 } Scanner;
 
-Scanner scanner;
+Scanner scanner;                
 
+// Initializes scanner, feed a reference to source code into it
 void initScanner(const char* source) {
     scanner.start = source;
     scanner.current = source;
     scanner.line = 1;
 }
 
+//  Returns true if c is a letter (a-z, A-Z, or _)
 static bool isAlpha(char c) {
-    return (c >= 'a' && c <= 'z') ||
-           (c >= 'A' && c <= 'Z') ||
-            c == '_';
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
+// Returns true if c is a # from 0-9
 static bool isDigit(char c) {
     return c >= '0' && c <= '9';
 }
 
+// If the current character in token reaches null byte (end of input)
 static bool isAtEnd() {
     return *scanner.current == '\0';
 }
 
+// Moves to next character, returns prev one
 static char advance() {
     scanner.current++;
     return scanner.current[-1];
 }
 
+// Peek at current char in token without consuming
 static char peek() {
     return *scanner.current;
 }
 
+// Look at next char
 static char peekNext() {
     if (isAtEnd()) return '\0';
     return scanner.current[1];
 }
 
+// To differentiate < to <=, ! to !=, etc.
 static bool match(char expected) {
     if (isAtEnd()) return false;
     if (*scanner.current != expected) return false;
@@ -101,9 +107,9 @@ static void skipWhitespace() {
 static TokenType checkKeyword(int start, int length,
     const char* rest, TokenType type) {
   if (scanner.current - scanner.start == start + length &&
-        memcmp(scanner.start + start, rest, length) == 0) {
+        memcmp(scanner.start + start, rest, length) == 0) {                     // memcmp compares blocks of memory up to a byte length to see if equal
         return type;
-  }
+    }
 
   return TOKEN_IDENTIFIER;
 }
@@ -175,6 +181,7 @@ static Token string() {
     return makeToken(TOKEN_STRING);
 }
 
+// Tokenizing Operators & Symbols (differentiates single & double char operators using match())
 Token scanToken() {
     skipWhitespace();
     scanner.start = scanner.current;
