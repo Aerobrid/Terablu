@@ -116,7 +116,19 @@ static InterpretResult run() {
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
-            }                          
+            } 
+            case OP_CONDITIONAL: {
+                Value elseBranch = pop();  // Evaluate the "else" branch
+                Value thenBranch = pop();  // Evaluate the "then" branch
+                Value condition = pop();   // Get the condition
+            
+                if (isTruthy(condition)) {
+                    push(thenBranch);
+                } else {
+                    push(elseBranch);
+                }
+                break;
+            }                         
             case OP_RETURN: {
                 printValue(pop());
                 printf("\n");

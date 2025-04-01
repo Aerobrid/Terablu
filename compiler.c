@@ -183,6 +183,7 @@ ParseRule rules[] = {
 	[TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
 	[TOKEN_PERCENT]       = {NULL,     binary, PREC_TERM},
 	[TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_QUESTION]      = {NULL, conditional, PREC_CONDITIONAL},
 	[TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
 	[TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
 	[TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
@@ -243,13 +244,16 @@ static void expression() {
 
 static void conditional()
 {
-  // Compile the then branch.
-  parsePrecedence(PREC_CONDITIONAL);
+  	// Compile the then branch.
+  	parsePrecedence(PREC_CONDITIONAL);
 
-  consume(TOKEN_COLON, "Expect ':' after then branch of conditional operator.");
+  	consume(TOKEN_COLON, "Expect ':' after then branch of conditional operator.");
 
-  // Compile the else branch.
-  parsePrecedence(PREC_ASSIGNMENT);
+  	// Compile the else branch.
+  	parsePrecedence(PREC_ASSIGNMENT);
+
+    // Emit bytecode for conditional operation
+    emitByte(OP_CONDITIONAL);
 }
 
 bool compile(const char* source, Chunk* chunk) {

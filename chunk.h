@@ -17,6 +17,7 @@ typedef enum {
     OP_MODULUS,
     OP_CONSTANT_LONG,
     OP_RETURN,
+    OP_CONDITIONAL,
 } OpCode;
 
 typedef struct {
