@@ -20,6 +20,7 @@ typedef struct {
 typedef enum {
 	PREC_NONE,
 	PREC_ASSIGNMENT,  // =
+	PREC_CONDITIONAL, // ?:
 	PREC_OR,          // or
 	PREC_AND,         // and
 	PREC_EQUALITY,    // == !=
@@ -238,6 +239,17 @@ static ParseRule* getRule(TokenType type) {
 
 static void expression() {
 	parsePrecedence(PREC_ASSIGNMENT);
+}
+
+static void conditional()
+{
+  // Compile the then branch.
+  parsePrecedence(PREC_CONDITIONAL);
+
+  consume(TOKEN_COLON, "Expect ':' after then branch of conditional operator.");
+
+  // Compile the else branch.
+  parsePrecedence(PREC_ASSIGNMENT);
 }
 
 bool compile(const char* source, Chunk* chunk) {
