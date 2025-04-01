@@ -91,9 +91,18 @@ static void skipWhitespace() {
                 advance();
                 break;
             case '/':
-                if (peekNext() == '/') {
-                    // A comment goes until the end of the line.
+                if (peekNext() == '/') { // Single-line comment
                     while (peek() != '\n' && !isAtEnd()) advance();
+                } else if (peekNext() == '*') { // Multi-line comment
+                    advance(); // Consume '*'
+                    while (!isAtEnd()) {
+                        if (peek() == '*' && peekNext() == '/') {
+                            advance(); advance(); // Consume "*/"
+                            break;
+                        }
+                        if (peek() == '\n') scanner.line++; // Handle newlines
+                        advance();
+                    }
                 } else {
                     return;
                 }
@@ -171,6 +180,9 @@ static Token number() {
 static Token string() {
     while (peek() != '"' && !isAtEnd()) {
         if (peek() == '\n') scanner.line++;
+        if (peek() == '\\' && peekNext() == '"') {
+            advance(); // Skip the backslash
+        }
         advance();
     }
   
@@ -199,7 +211,7 @@ Token scanToken() {
         case '}': return makeToken(TOKEN_RIGHT_BRACE);
         case ';': return makeToken(TOKEN_SEMICOLON);
         case ':': return makeToken(TOKEN_COLON);
-        case '?': return makeToken(TOKEN_HUH);
+        case '?': return makeToken(TOKEN_QUESTION);
         case ',': return makeToken(TOKEN_COMMA);
         case '.': return makeToken(TOKEN_DOT);
         case '-': return makeToken(TOKEN_MINUS);
@@ -207,18 +219,11 @@ Token scanToken() {
         case '/': return makeToken(TOKEN_SLASH);
         case '*': return makeToken(TOKEN_STAR);
         case '%': return makeToken(TOKEN_PERCENT);
-        case '!':
-            return makeToken(
-                match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-        case '=':
-            return makeToken(
-                match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-        case '<':
-            return makeToken(
-                match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-        case '>':
-            return makeToken(
-                match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+        // Handle two-character operators
+        case '!': return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
+        case '=': return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+        case '<': return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+        case '>': return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
         case '"': return string();
     }
   
