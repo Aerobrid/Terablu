@@ -1,3 +1,4 @@
+// Include guard
 #ifndef clox_compiler_h
 #define clox_compiler_h 
 
@@ -5,4 +6,5 @@
 
 bool compile(const char* source, Chunk* chunk);
 
+// End include guard
 #endif

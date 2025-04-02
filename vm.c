@@ -142,6 +142,9 @@ static InterpretResult run() {
     #undef BINARY_OP
 }
 
+// create a new empty chunk and pass it over to the compiler,
+// which will fill it up with bytecode IF program does not have compile errors
+// then send completed chunk over to the VM to be executed, then free it
 InterpretResult interpret(const char* source) {
     Chunk chunk;
     initChunk(&chunk);
