@@ -168,6 +168,7 @@ static void binary() {
 	ParseRule* rule = getRule(operatorType);
 	parsePrecedence((Precedence)(rule->precedence + 1));
   
+	// Emit the operator instruction.
 	switch (operatorType) {
 		case TOKEN_BANG_EQUAL:    emitBytes(OP_EQUAL, OP_NOT); break;
 		case TOKEN_EQUAL_EQUAL:   emitByte(OP_EQUAL); break;
@@ -176,7 +177,8 @@ static void binary() {
 		case TOKEN_LESS:          emitByte(OP_LESS); break;
 		case TOKEN_LESS_EQUAL:    emitBytes(OP_GREATER, OP_NOT); break;
 	  	case TOKEN_PLUS:          emitByte(OP_ADD); break;
-	  	case TOKEN_MINUS:         emitByte(OP_SUBTRACT); break;
+		// Having both OP_NEGATE and OP_SUBTRACT is redundant. We can replace subtraction with negate-then-add:
+		case TOKEN_MINUS:         emitBytes(OP_NEGATE, OP_ADD); break; // <--
 	  	case TOKEN_STAR:          emitByte(OP_MULTIPLY); break;
 	  	case TOKEN_SLASH:         emitByte(OP_DIVIDE); break;
 		case TOKEN_PERCENT:		  emitByte(OP_MODULUS); break;
