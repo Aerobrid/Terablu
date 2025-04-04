@@ -48,6 +48,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 
     uint8_t instruction = chunk->code[offset];
     // for disassembly support and easier debugs; Ex: Instruction executed -> return information regarding it
+    // extended support for more datatypes / operators
     switch (instruction) {
         case OP_CONSTANT:
             return constantInstruction("OP_CONSTANT", chunk, offset);

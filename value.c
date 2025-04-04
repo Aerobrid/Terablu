@@ -30,7 +30,7 @@ void freeValueArray(ValueArray* array) {
     initValueArray(array);
 }
 
-
+// now can handle nil, booleans, and # values
 void printValue(Value value) {
 	switch (value.type) {
 		case VAL_BOOL:

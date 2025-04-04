@@ -74,6 +74,7 @@ static InterpretResult run() {
     #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])       // Macro that reads constant value from chunk, next line is long const
     #define READ_CONSTANT_LONG() ((vm.chunk->constants.values[(READ_BYTE() << 16) | (READ_BYTE() << 8) | READ_BYTE()]))
     // Macro that Pops 2 values from stack, applies the operation (op) to the 2 values, then pushes the result back to stack
+    // you can pass macros as parameters to macros
     #define BINARY_OP(valueType, op) \
     do { \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \

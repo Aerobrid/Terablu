@@ -26,13 +26,16 @@ typedef struct {
     } as;                       // union to store the actual value
 } Value;
 
+// takes a C value of the appropriate type and produces a Value that has the correct type tag and contains the underlying value
 #define IS_BOOL(value)    ((value).type == VAL_BOOL)
 #define IS_NIL(value)     ((value).type == VAL_NIL)
 #define IS_NUMBER(value)  ((value).type == VAL_NUMBER)
 
+// given a Value of the right type, these macros unwrap it and return the corresponding raw C value
 #define AS_BOOL(value)    ((value).as.boolean)
 #define AS_NUMBER(value)  ((value).as.number)
 
+// return true if the Value has that type
 #define BOOL_VAL(value)   ((Value){VAL_BOOL, {.boolean = value}})
 #define NIL_VAL           ((Value){VAL_NIL, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VAL_NUMBER, {.number = value}})

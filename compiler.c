@@ -223,7 +223,8 @@ static void unary() {
 }
 
 // parsing rules for each token type
-// parsing table that hands control when called to a function by pointer if possible
+// table-based pratt parser that hands control when called to a function by pointer if possible
+// new operators and datatype support
 ParseRule rules[] = {
 	[TOKEN_LEFT_PAREN]    = {grouping, NULL,   PREC_NONE},
 	[TOKEN_RIGHT_PAREN]   = {NULL,     NULL,   PREC_NONE},
