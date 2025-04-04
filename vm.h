@@ -19,6 +19,7 @@ typedef struct {
     Value* stack;                               // VM Dynamic Stack
     int stackCount;                             // Current element count within VM stack
     int stackCapacity;                          // Total capacity of VM stack
+    Obj* objects;                               // VM stores a pointer to the head of a linked list used to find every allocated object (to avoid memory leakage)
 } VM;
 
 // The VM runs the chunk and then responds with a value from this enum:
@@ -27,7 +28,8 @@ typedef enum {
     INTERPRET_COMPILE_ERROR,                    // syntax/parsing error
     INTERPRET_RUNTIME_ERROR                     // runtime error (e.g., stack overflow, invalid operation)
 } InterpretResult;
-  
+
+extern VM vm;                                   // exposes vm variable to other files as a global var
 
 // Declare VM functions
 void initVM();
