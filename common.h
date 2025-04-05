@@ -12,5 +12,8 @@
 #define DEBUG_PRINT_CODE
 #define DEBUG_TRACE_EXECUTION
 
+// fixed size for local array
+#define UINT8_COUNT (UINT8_MAX + 1)
+
 // #pragma once (might be better to use instead of #endif but might not work with all compilers)
 #endif                // Ends the include/macro guard
