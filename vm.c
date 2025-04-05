@@ -39,11 +39,13 @@ static void runtimeError(const char* format, ...) {
 void initVM() {
     vm.stack = NULL;                // Nothing in VM stack since VM has just been created
     vm.stackCapacity = 0;           
-    resetStack();
+    resetStack();                   // stack initially empty
     vm.objects = NULL;              // Nothing in LL since VM has just been created
+    initTable(&vm.strings);         // string table initially empty
 }
 
 void freeVM() {
+    freeTable(&vm.strings);         
     freeObjects();                  // to free every object from user program
     free(vm.stack);
     vm.stack = NULL;                // Prevents dangling pointers

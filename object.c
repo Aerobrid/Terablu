@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "object.h"
+#include "table.h"
 #include "value.h"
 #include "vm.h"
 
@@ -20,24 +21,51 @@ static Obj* allocateObject(size_t size, ObjType type) {
     return object;
 }
 
-// creates a new ObjString on the heap and then initializes its fields
-static ObjString* allocateString(char* chars, int length) {
+// creates a new ObjString on the heap and then initializes its fields, pass in it's hash code as well
+static ObjString* allocateString(char* chars, int length, uint32_t hash) {
     ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
     string->length = length;
     string->chars = chars;
+    string->hash = hash;
+    tableSet(&vm.strings, string, NIL_VAL);
     return string;
 }
 
-// claims ownership of the string given (useful for string concatenation when dynamically allocating char array on heap - no need for a redundant copy)
-ObjString* takeString(char* chars, int length) {
-    return allocateString(chars, length);
+// hashing algorithm used in function is called "FNV-1a"
+// starts initial hash as some value, then "mixes bits mathematically" to get output (hash code)
+static uint32_t hashString(const char* key, int length) {
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < length; i++) {
+        hash ^= (uint8_t)key[i];
+        hash *= 16777619;
+    }
+    return hash;
 }
 
+// claims ownership of the string given (useful for string concatenation when dynamically allocating char array on heap - no need for a redundant copy)
+// modfified to also calculate the hash code and pass it on, includes string interning
+ObjString* takeString(char* chars, int length) {
+    uint32_t hash = hashString(chars, length);
+    ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+    if (interned != NULL) {
+        FREE_ARRAY(char, chars, length + 1);
+        return interned;
+    }
+
+    return allocateString(chars, length, hash);
+}
+
+// modfified to also calculate the hash code and pass it on, includes string interning
 ObjString* copyString(const char* chars, int length) {
-  char* heapChars = ALLOCATE(char, length + 1);
-  memcpy(heapChars, chars, length);
-  heapChars[length] = '\0';
-  return allocateString(heapChars, length);
+    uint32_t hash = hashString(chars, length);
+
+    ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+    if (interned != NULL) return interned;
+
+    char* heapChars = ALLOCATE(char, length + 1);
+    memcpy(heapChars, chars, length);
+    heapChars[length] = '\0';
+    return allocateString(heapChars, length, hash);
 }
 
 // for printing obj values

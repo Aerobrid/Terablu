@@ -4,6 +4,8 @@
 
 // required for handling bytecode storage
 #include "chunk.h"
+// required for hash-table implementation
+#include "table.h"
 // manages runtime values used in the VM
 #include "value.h"
 
@@ -19,6 +21,7 @@ typedef struct {
     Value* stack;                               // VM Dynamic Stack
     int stackCount;                             // Current element count within VM stack
     int stackCapacity;                          // Total capacity of VM stack
+    Table strings;
     Obj* objects;                               // VM stores a pointer to the head of a linked list used to find every allocated object (to avoid memory leakage)
 } VM;
 
