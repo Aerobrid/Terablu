@@ -1,11 +1,5 @@
-switch (2) {
-case 1:
-  print("one");
-case 2:
-  print("two");
-case 3:
-  print("three");
-default:
-  print("default");
-}
-print("after");
+// Assignment on RHS of variable.
+var a = "before";
+var c = a = "var";
+print a; // expect: var
+print c; // expect: var
