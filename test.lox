@@ -1,5 +1,4 @@
-// Assignment on RHS of variable.
-var a = "before";
-var c = a = "var";
-print a; // expect: var
-print c; // expect: var
+{
+  var a = "value";
+  var a = "other"; // Error at 'a': Already a variable with this name in this scope.
+}
