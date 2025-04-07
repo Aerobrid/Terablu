@@ -22,6 +22,7 @@ typedef struct {
 	bool panicMode;						// this prevents further error messages from being generated after an error is encountered
 } Parser;
 
+// global variables used for forloop parsing/compiling
 int innermostLoopStart = -1;
 int innermostLoopScopeDepth = 0;
 
@@ -167,7 +168,7 @@ static void emitLoop(int loopStart) {
 	emitByte(offset & 0xff);
 }
 
-// writes placeholder operand for the jump offset (will be complete with backpatching)
+// writes placeholder operand for the jump offset (which will be complete with backpatching function)
 static int emitJump(uint8_t instruction) {
 	emitByte(instruction);
 	emitByte(0xff);
@@ -345,12 +346,12 @@ static void defineVariable(uint8_t global) {
 
 // using short-circuit method to lessen resources
 static void and_(bool canAssign) {
-	int endJump = emitJump(OP_JUMP_IF_FALSE);
+	int endJump = emitJump(OP_JUMP_IF_FALSE);			// jump if left operand is false
   
-	emitByte(OP_POP);
-	parsePrecedence(PREC_AND);
+	emitByte(OP_POP);									// discard left operand if true
+	parsePrecedence(PREC_AND);							// parse right operand
   
-	patchJump(endJump);
+	patchJump(endJump);									// patch jump to skip right side if left was false
 }
 
 // handles binary operator parsing
@@ -377,6 +378,7 @@ static void binary(bool canAssign) {
 	}
 }
 
+// compiles literal tokens like nil, true, false into bytecode instructions
 static void literal(bool canAssign) {
 	switch (parser.previous.type) {
 	  	case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -398,15 +400,16 @@ static void number(bool canAssign) {
 	emitConstant(NUMBER_VAL(value));
 }
 
+// also uses short-circuiting technique
 static void or_(bool canAssign) {
-	int elseJump = emitJump(OP_JUMP_IF_FALSE);
-	int endJump = emitJump(OP_JUMP);
-  
-	patchJump(elseJump);
-	emitByte(OP_POP);
-  
-	parsePrecedence(PREC_OR);
-	patchJump(endJump);
+	int elseJump = emitJump(OP_JUMP_IF_FALSE); 			// jump if left is false
+	int endJump = emitJump(OP_JUMP);           			// if true, skip right side
+
+	patchJump(elseJump); 								// jump here if false
+	emitByte(OP_POP);    								// discard left if false
+	
+	parsePrecedence(PREC_OR); 							// parse right side
+	patchJump(endJump);									// jump here if left was true
 }
 
 // when parser hits string token, call this function from pratt-parse table
@@ -416,6 +419,7 @@ static void string(bool canAssign) {
 	emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
+// determines whether var is global or local, then based on next token being '=', determines value assignment
 static void namedVariable(Token name, bool canAssign) {
 	uint8_t getOp, setOp;
 	int arg = resolveLocal(current, &name);
@@ -533,10 +537,12 @@ static ParseRule* getRule(TokenType type) {
 	return &rules[type];
 }
 
+// starts pasring expressions
 static void expression() {
 	parsePrecedence(PREC_ASSIGNMENT);
 }
 
+// parses block of code (ex: {...block of code...})
 static void block() {
 	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
 	  	declaration();
@@ -545,7 +551,8 @@ static void block() {
 	consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
-// if var token is matched, jump to this function
+// if var token is matched, jump to this function (parses and compiles var declaration)
+// if there is an initializer like '=' parse expression, if not, value within var is set to nil
 static void varDeclaration() {
 	uint8_t global = parseVariable("Expect variable name.");
   
@@ -559,12 +566,15 @@ static void varDeclaration() {
 	defineVariable(global);
 }
 
+// Ex: a + b; (it is popped off stack since we usually want to discard expressions like this)
+// more cares has to be taken into account for variables
 static void expressionStatement() {
 	expression();
 	consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
 	emitByte(OP_POP);
 }
 
+// for parsing for loops, continue keyword support added
 static void forStatement() {
 	beginScope();
 	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
@@ -576,10 +586,10 @@ static void forStatement() {
 		expressionStatement();
 	}
 
-	int surroundingLoopStart = innermostLoopStart; // <--
-	int surroundingLoopScopeDepth = innermostLoopScopeDepth; // <--
-	innermostLoopStart = currentChunk()->count; // <--
-	innermostLoopScopeDepth = current->scopeDepth; // <--  
+	int surroundingLoopStart = innermostLoopStart; 
+	int surroundingLoopScopeDepth = innermostLoopScopeDepth; 
+	innermostLoopStart = currentChunk()->count; 
+	innermostLoopScopeDepth = current->scopeDepth;   
   
 	int loopStart = currentChunk()->count;
 	int exitJump = -1;
@@ -602,27 +612,28 @@ static void forStatement() {
 		emitLoop(loopStart);
 		loopStart = incrementStart;
 
-		emitLoop(innermostLoopStart); // <--
-		innermostLoopStart = incrementStart; // <--
+		emitLoop(innermostLoopStart); 
+		innermostLoopStart = incrementStart; 
 		patchJump(bodyJump);
 	}
   
 	statement();
-
 	
-	emitLoop(innermostLoopStart); // <--
+	emitLoop(innermostLoopStart); 
 
 	if (exitJump != -1) {
 		patchJump(exitJump);
 		emitByte(OP_POP); // Condition.
 	}
 
-	innermostLoopStart = surroundingLoopStart; // <--
-	innermostLoopScopeDepth = surroundingLoopScopeDepth; // <--
+	innermostLoopStart = surroundingLoopStart; 
+	innermostLoopScopeDepth = surroundingLoopScopeDepth; 
 	
 	endScope();
 }
 
+// handles continue keyword during parsing
+// checks to see if inside loop, then pops all local variables inside current iteration, then jumps to top of loop using innermostLoopStart 
 static void continueStatement() {
 	if (innermostLoopStart == -1) {
 	  error("Can't use 'continue' outside of a loop.");
@@ -660,6 +671,7 @@ static void ifStatement() {
 	patchJump(elseJump);
 }
 
+// for parsing switch statement (might be changed later on to be more pythonic depending on efficiency)
 static void switchStatement() {
 	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
 	expression();
@@ -730,12 +742,15 @@ static void switchStatement() {
 	emitByte(OP_POP); // The switch value.
 }
 
+// parses through expression expecting a semicolon token, and emits the print bytecode instruction
 static void printStatement() {
 	expression();
 	consume(TOKEN_SEMICOLON, "Expect ';' after value.");
 	emitByte(OP_PRINT);
 }
 
+// Records start of loop, Parses condition, jump out if false, Parse body, then jump back to top
+// Patches the exit jump, and pops the condition result afterwards
 static void whileStatement() {
 	int loopStart = currentChunk()->count;
 	consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
@@ -751,6 +766,7 @@ static void whileStatement() {
 	emitByte(OP_POP);
 }
 
+// called when parser in panic mode (after there was an error), to keep on parsing properly (avoids cascading compile errors) 
 static void synchronize() {
 	parser.panicMode = false;
   
