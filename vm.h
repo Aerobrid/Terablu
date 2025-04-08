@@ -2,22 +2,34 @@
 #ifndef clox_vm_h
 #define clox_vm_h
 
-// required for handling bytecode storage
-#include "chunk.h"
+// required for access to ObjFunction
+#include "object.h"
 // required for hash-table implementation
 #include "table.h"
 // manages runtime values used in the VM
 #include "value.h"
 
-// Max size for VM's stack
-#define STACK_MAX 256
+// redefining size for VM's value stack
+// to make sure we have plenty of stack slots even in very deep call trees
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
+
+// for functions (call-stack), represents single ongoing function call
+// Each time a function is called, we create one of these structs
+typedef struct {
+    ObjFunction* function;                      // pointer to the function being called 
+    uint8_t* ip;                                // the caller stores its own instruction pointer, so it acts like a return address (remember it points to current line to be executed)
+    Value* slots;                               //  points into the VM’s value stack at the first slot that this function can use
+} CallFrame;
 
 // A stack-based VM structure that takes in a chunk to run/execute
-// IP = instruction pointer ()
-// it’s faster to dereference a pointer than look up an element in the bytecode array by index.
+// IP = instruction pointer
+// CallFrame array replaces the chunk and ip fields
+// Now each CallFrame has its own ip and its own pointer to the ObjFunction that it’s executing. From there, we can get to the function’s chunk.
 typedef struct {
-    Chunk* chunk;                               // Stores a pointer to the chunk of bytecode that the VM will execute.
-    uint8_t* ip;                                // Instruction pointer that tracks the position in the bytecode.
+    CallFrame frames[FRAMES_MAX];               // array of CallFrame structs, treated like a stack like with the value array (call-stack)
+    int frameCount;                             // stores current height of the CallFrame stack (# of ongoing function calls)
+
     Value* stack;                               // VM Dynamic Stack
     int stackCount;                             // Current element count within VM stack
     int stackCapacity;                          // Total capacity of VM stack
