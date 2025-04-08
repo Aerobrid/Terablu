@@ -15,10 +15,12 @@
 // global instance makes it easier to manage, not necessarily the best implementation when compared to a VM pointer
 VM vm; 
 
+// native clock function using time header returning time started since program started (in seconds)
 static Value clockNative(int argCount, Value* args) {
     return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
+// to reset/initialize vm's value stack
 static void resetStack() {
     vm.stackCount = 0;
     vm.frameCount = 0;
@@ -28,6 +30,7 @@ static void resetStack() {
     }
 }
 
+// prints out stack trace and where error occured if any, useful in debugging
 static void runtimeError(const char* format, ...) {
     va_list args;
     va_start(args, format);
@@ -49,6 +52,7 @@ static void runtimeError(const char* format, ...) {
     resetStack();
 }
 
+// gives a native function a name, so it can be used in CLOX language with other user-defined functions
 static void defineNative(const char* name, NativeFn function) {
     push(OBJ_VAL(copyString(name, (int)strlen(name))));
     push(OBJ_VAL(newNative(function)));
@@ -70,13 +74,14 @@ void initVM() {
     defineNative("clock", clockNative);
 }
 
+// frees memory from VM processes
 void freeVM() {
-    freeTable(&vm.globals);
-    freeTable(&vm.strings);         
+    freeTable(&vm.globals);         // free global var hashtable from heap
+    freeTable(&vm.strings);         // free string hashtable from heap
     freeObjects();                  // to free every object from user program
-    free(vm.stack);
+    free(vm.stack);                 // free the value stack
     vm.stack = NULL;                // Prevents dangling pointers
-    vm.stackCapacity = 0;
+    vm.stackCapacity = 0;           // set to 0
     resetStack();
 }
 
@@ -101,6 +106,7 @@ static Value peek(int distance) {
     return vm.stack[vm.stackCount - 1 - distance];
 }
 
+// sets up new CallFrame and stack slots for a function
 static bool call(ObjFunction* function, int argCount) {
     if (argCount != function->arity) {
         runtimeError("Expected %d arguments but got %d.", function->arity, argCount);
@@ -119,6 +125,7 @@ static bool call(ObjFunction* function, int argCount) {
     return true;
 }
 
+// Determines whether callee is a native or user-defined function
 static bool callValue(Value callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
@@ -139,6 +146,7 @@ static bool callValue(Value callee, int argCount) {
     return false;
 }
 
+// determine whether given value is falsey
 static bool isFalsey(Value value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -159,6 +167,9 @@ static void concatenate() {
     push(OBJ_VAL(result));
 }
 
+// bytecode interpreter loop
+// endlessly reads next instruction, performs appropriate instruction, and updates stack/ip accordingly
+// macros simplify the process
 static InterpretResult run() {
     CallFrame* frame = &vm.frames[vm.frameCount - 1];
 

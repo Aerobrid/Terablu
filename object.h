@@ -47,9 +47,10 @@ typedef struct {
 
 typedef Value (*NativeFn)(int argCount, Value* args);
 
+// native functions is a type of obj, needs its own struct
 typedef struct {
-    Obj obj;
-    NativeFn function;
+    Obj obj;                    // obj header (base struct for all things strings, functions, classes, etc.)
+    NativeFn function;          // takes the argument count and a pointer to the first argument on the stack. It accesses the arguments through that pointer. Once it’s done, it returns the result value.
 } ObjNative;
 
 struct ObjString {

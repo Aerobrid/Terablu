@@ -373,15 +373,16 @@ static void defineVariable(uint8_t global) {
 	emitBytes(OP_DEFINE_GLOBAL, global);
 }
 
+// compile arguments for function (arguments != parameters)
 static uint8_t argumentList() {
 	uint8_t argCount = 0;
 	if (!check(TOKEN_RIGHT_PAREN)) {
 	  do {
-		expression();
-		if (argCount == 255) {
-			error("Can't have more than 255 arguments.");
-		}
-		argCount++;
+			expression();
+			if (argCount == 255) {
+				error("Can't have more than 255 arguments.");
+			}
+			argCount++;
 	  } while (match(TOKEN_COMMA));
 	}
 	consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
@@ -422,6 +423,7 @@ static void binary(bool canAssign) {
 	}
 }
 
+// when parsing through a call to a function
 static void call(bool canAssign) {
 	uint8_t argCount = argumentList();
 	emitBytes(OP_CALL, argCount);
@@ -601,30 +603,42 @@ static void block() {
 }
 
 static void function(FunctionType type) {
-	Compiler compiler;
-	initCompiler(&compiler, type);
-	beginScope(); 
-  
-	consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-	if (!check(TOKEN_RIGHT_PAREN)) {
-		do {
-		  	current->function->arity++;
-		  	if (current->function->arity > 255) {
-				errorAtCurrent("Can't have more than 255 parameters.");
-		  	}
-		  	uint8_t constant = parseVariable("Expect parameter name.");
-		  	defineVariable(constant);
-		} while (match(TOKEN_COMMA));
-	}
+    // Create a new compiler for the function being compiled.
+    Compiler compiler;
+    initCompiler(&compiler, type);
 
-	consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
-	consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
-	block();
-  
-	ObjFunction* function = endCompiler();
-	emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+    // Begin a new scope for the function body.
+    beginScope();
+
+    // Parse the parameter list inside parentheses `()`.
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+    if (!check(TOKEN_RIGHT_PAREN)) { // If there are parameters, parse them.
+        do {
+            // Increment the function's arity (number of parameters).
+            current->function->arity++;
+            if (current->function->arity > 255) {
+                errorAtCurrent("Can't have more than 255 parameters.");
+            }
+
+            // Parse the parameter name and add it as a local variable.
+            uint8_t constant = parseVariable("Expect parameter name.");
+            defineVariable(constant);
+        } while (match(TOKEN_COMMA)); // Continue parsing parameters separated by commas.
+    }
+
+    // Ensure the parameter list is properly closed with a `)`.
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+    // Parse the function body enclosed in `{}`.
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+    block();
+
+    // Finalize the compilation of the function and emit it as a constant.
+    ObjFunction* function = endCompiler();
+    emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
 }
 
+// compiles function declaration
 static void funDeclaration() {
 	uint8_t global = parseVariable("Expect function name.");
 	markInitialized();
@@ -717,16 +731,16 @@ static void forStatement() {
 // checks to see if inside loop, then pops all local variables inside current iteration, then jumps to top of loop using innermostLoopStart 
 static void continueStatement() {
 	if (innermostLoopStart == -1) {
-	  error("Can't use 'continue' outside of a loop.");
+	  	error("Can't use 'continue' outside of a loop.");
 	}
   
 	consume(TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
   
 	// Discard any locals created inside the loop.
 	for (int i = current->localCount - 1;
-		 i >= 0 && current->locals[i].depth > innermostLoopScopeDepth;
-		 i--) {
-	  emitByte(OP_POP);
+		i >= 0 && current->locals[i].depth > innermostLoopScopeDepth;
+		i--) {
+	  	emitByte(OP_POP);
 	}
   
 	// Jump to top of current innermost loop.
@@ -830,6 +844,7 @@ static void printStatement() {
 	emitByte(OP_PRINT);
 }
 
+// compiles a return statement (result of an expression)
 static void returnStatement() {
 	if (current->type == TYPE_SCRIPT) {
 		error("Can't return from top-level code.");

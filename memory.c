@@ -16,6 +16,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
 // free character array, then the ObjString
 // free objFunction if any function is allocated bits of memory, and free its respective chunk
+// VM also needs to know how to deallocate a nativefunction obj
 static void freeObject(Obj* object) {
 	switch (object->type) {
 		case OBJ_FUNCTION: {
