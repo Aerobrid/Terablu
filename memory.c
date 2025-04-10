@@ -17,8 +17,16 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 // free character array, then the ObjString
 // free objFunction if any function is allocated bits of memory, and free its respective chunk
 // VM also needs to know how to deallocate a nativefunction obj
+// when done with a closure, you free it's memory
+// Same thing with an upvalue, for when we do not need the local variable anymore.
 static void freeObject(Obj* object) {
 	switch (object->type) {
+		case OBJ_CLOSURE: {
+			ObjClosure* closure = (ObjClosure*)object;
+			FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
+			FREE(ObjClosure, object);
+			break;
+		}
 		case OBJ_FUNCTION: {
 			ObjFunction* function = (ObjFunction*)object;
 			freeChunk(&function->chunk);
@@ -34,6 +42,9 @@ static void freeObject(Obj* object) {
 			FREE(ObjString, object);
 			break;
 	  	}
+		case OBJ_UPVALUE:
+		  	FREE(ObjUpvalue, object);
+		  	break;
 	}
 }
 

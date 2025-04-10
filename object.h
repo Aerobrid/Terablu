@@ -11,12 +11,15 @@
 
 // checks if given Value is a function by calling isObjType()
 #define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
-
+// to check if a value is a native function
 #define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
-
+// to check if value is a closure
+#define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
 // to ensure that the Obj* pointer you have does point to the obj field of an actual ObjString
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 
+// casts the value to ObjClosure pointer
+#define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
 // casts the value to ObjFunction pointer
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
 
@@ -28,9 +31,11 @@
 
 // different type tags for each obj
 typedef enum {
+    OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
+    OBJ_UPVALUE
 } ObjType;
 
 struct Obj {
@@ -41,6 +46,7 @@ struct Obj {
 typedef struct {
     Obj obj;                    // functions are 1st-class, so they need to be an obj
     int arity;                  // stores the # of parameters function is expecting
+    int upvalueCount;
     Chunk chunk;                // Each function has its own chunk to be processed
     ObjString* name;            // function name
 } ObjFunction;
@@ -60,10 +66,26 @@ struct ObjString {
     uint32_t hash;              // each ObjString stores the hash code for its string
 };
 
+typedef struct ObjUpvalue {
+    Obj obj;                     // Every object starts with an Obj header
+    Value* location;             // Points to the variable in the VM's stack
+    Value closed;                // If the variable is closed, value is copied here
+    struct ObjUpvalue* next;     // Linked list pointer (used by VM to track open upvalues)
+} ObjUpvalue;
+
+typedef struct {
+    Obj obj;                    // closure will contain an object tag
+    ObjFunction* function;      // the function being closed over
+    ObjUpvalue** upvalues;      // array of pointers to upvalue objects
+    int upvalueCount;           // how many upvalues it has
+} ObjClosure;
+
+ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
 ObjNative* newNative(NativeFn function);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);
+ObjUpvalue* newUpvalue(Value* slot);
 void printObject(Value value);
 
 // Q: Why not just put the body of this function right in the macro? 

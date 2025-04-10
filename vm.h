@@ -17,7 +17,7 @@
 // for functions (call-stack), represents single ongoing function call
 // Each time a function is called, we create one of these structs
 typedef struct {
-    ObjFunction* function;                      // pointer to the function being called 
+    ObjClosure* closure;                        // pointer to the function being called 
     uint8_t* ip;                                // the caller stores its own instruction pointer, so it acts like a return address (remember it points to current line to be executed)
     Value* slots;                               //  points into the VM’s value stack at the first slot that this function can use
 } CallFrame;
@@ -33,8 +33,9 @@ typedef struct {
     Value* stack;                               // VM Dynamic Stack
     int stackCount;                             // Current element count within VM stack
     int stackCapacity;                          // Total capacity of VM stack
-    Table globals;
-    Table strings;
+    Table globals;                              // hash-table storing global variables
+    Table strings;                              // hash-table storing unique strings (for string interning)
+    ObjUpvalue* openUpvalues;                   // A linked list of "open" upvalues — variables that are captured by closures, but still live on the stack
     Obj* objects;                               // VM stores a pointer to the head of a linked list used to find every allocated object (to avoid memory leakage)
 } VM;
 

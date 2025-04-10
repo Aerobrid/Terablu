@@ -18,6 +18,8 @@ typedef enum {
     OP_GET_GLOBAL,
     OP_DEFINE_GLOBAL,
     OP_SET_GLOBAL,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_DUP,
     OP_EQUAL,
     OP_GREATER,
@@ -33,15 +35,18 @@ typedef enum {
     OP_JUMP_IF_FALSE,
     OP_LOOP,
     OP_CALL,
+    OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
     OP_MODULUS,
     OP_CONSTANT_LONG,
     OP_RETURN,
     OP_CONDITIONAL,
 } OpCode;
 
+//  maps bytecode instructions back to source code lines
 typedef struct {
-    int offset;
-    int line;
+    int offset;             // index in bytecode array where source code line begins
+    int line;               // line number in integer form
 } LineStart;
 
 // Defining the chunk structure
@@ -49,9 +54,9 @@ typedef struct {
     int count;              //  Number of bytes currently in the chunk.
     int capacity;           //  Maximum bytes the chunk can hold before resizing.
     uint8_t* code;          //  Pointer to a dynamic array of bytecode instructions (opcodes).
-    int lineCount;
-    int lineCapacity;
-    LineStart* lines;
+    int lineCount;          // how many linestart entries are currently stored
+    int lineCapacity;       // allocated size (# of LineStart entries) for the dynamic array lines
+    LineStart* lines;       //  pointer to a dynamic array of LineStart structs
     ValueArray constants;   //  Each chunk will carry with it a list of the values/constants that appear in the program
 } Chunk;
 
