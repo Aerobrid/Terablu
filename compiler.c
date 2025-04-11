@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "compiler.h"
+#include "memory.h"
 #include "scanner.h"
 
 #define MAX_CASES 256
@@ -60,8 +61,8 @@ typedef struct {
 	bool isCaptured;					// whether or not a local variable has been captured by a closure
 } Local;
 
-// when a closure captures a variable it must be stored in upvalue struct
-// so it can be referenced even when enclosing scope had ended
+// upvalue refers to a local variable in an enclosing function
+// when a closure captures a variable it must be stored in upvalue struct so it can be referenced even when enclosing scope had ended
 typedef struct {
 	uint8_t index;						// index of the local variable being captured
 	bool isLocal;						// whether or not variable is local to immediate closure (true) or is itself an upvalue from a higher level (false)
@@ -1046,4 +1047,13 @@ ObjFunction* compile(const char* source) {
 	freeTable(&stringConstants);
 	ObjFunction* function = endCompiler();
 	return parser.hadError ? NULL : function;
+}
+
+// for marking roots that compiler makes (compiler itself periodically grabs memory from the heap for literals and the constant table)
+void markCompilerRoots() {
+	Compiler* compiler = current;
+	while (compiler != NULL) {
+		markObject((Obj*)compiler->function);
+		compiler = compiler->enclosing;
+	}
 }

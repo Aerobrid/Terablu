@@ -12,12 +12,19 @@
 
 // allocates an object of the given size on the heap
 // every time we do so, add it onto the linked list as well
+// Every new object begins it's life unmarked (a white entry) because we haven’t yet determined if it is reachable or not
 static Obj* allocateObject(size_t size, ObjType type) {
     Obj* object = (Obj*)reallocate(NULL, 0, size);
     object->type = type;
+    object->isMarked = false;
 
     object->next = vm.objects;
     vm.objects = object;
+    
+  #ifdef DEBUG_LOG_GC
+    printf("%p allocate %zu for %d\n", (void*)object, size, type);
+  #endif
+
     return object;
 }
 
@@ -55,12 +62,17 @@ ObjNative* newNative(NativeFn function) {
 }
 
 // creates a new ObjString on the heap and then initializes its fields, pass in it's hash code as well
+// resizing string pool can trigger GC, so we stash new string on stack, since it initially is not reachable anywhere and will therefore not be marked by GC
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
     ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
     string->length = length;
     string->chars = chars;
     string->hash = hash;
+    
+    push(OBJ_VAL(string));
     tableSet(&vm.strings, string, NIL_VAL);
+    pop();
+
     return string;
 }
 

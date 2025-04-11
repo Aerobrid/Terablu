@@ -2,6 +2,7 @@
 
 #include "chunk.h"
 #include "memory.h"
+#include "vm.h"
 
 void initChunk(Chunk* chunk) {
     chunk->count = 0;       // No instructions added yet
@@ -68,8 +69,11 @@ int getLine(Chunk* chunk, int instruction) {
     }
 }
 
+// push constant on stack temporarily, then pop, since GC being triggered by constant table resizing can not mark a new possible object
 int addConstant(Chunk* chunk, Value value) {
+    push(value);
     writeValueArray(&chunk->constants, value);
+    pop();
     return chunk->constants.count - 1;                                 // Return the index where value is stored
 }
 

@@ -26,6 +26,7 @@ typedef struct {
 // IP = instruction pointer
 // CallFrame array replaces the chunk and ip fields
 // Now each CallFrame has its own ip and its own pointer to the ObjFunction that it’s executing. From there, we can get to the function’s chunk.
+// Every closure maintains an array of upvalues, one for each surrounding local variable that the closure uses
 typedef struct {
     CallFrame frames[FRAMES_MAX];               // array of CallFrame structs, treated like a stack like with the value array (call-stack)
     int frameCount;                             // stores current height of the CallFrame stack (# of ongoing function calls)
@@ -36,7 +37,13 @@ typedef struct {
     Table globals;                              // hash-table storing global variables
     Table strings;                              // hash-table storing unique strings (for string interning)
     ObjUpvalue* openUpvalues;                   // A linked list of "open" upvalues — variables that are captured by closures, but still live on the stack
+    
+    size_t bytesAllocated;                      // tracks total # of bytes currently allocated by VM, used to monitor memory usage and trigger the GC
+    size_t nextGC;                              // when bytesAllocated > nextGC, GC is triggered (after GC, is updated to a higher threshold based on the current memory usage)
     Obj* objects;                               // VM stores a pointer to the head of a linked list used to find every allocated object (to avoid memory leakage)
+    int grayCount;                              // Tracks the number of objects in the gray stack during garbage collection
+    int grayCapacity;                           // total capacity of the gray stack
+    Obj** grayStack;                            // A dynamically allocated stack used during garbage collection (GC)
 } VM;
 
 // The VM runs the chunk and then responds with a value from this enum:

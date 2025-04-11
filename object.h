@@ -39,7 +39,8 @@ typedef enum {
 } ObjType;
 
 struct Obj {
-    ObjType type;
+    ObjType type;               // the type of obj it is
+    bool isMarked;              // has it been marked by the garbage collector (GC) or not
     struct Obj* next;           // next pointer (intrusive list) for a Linked list to store every obj created/allocated onto heap 
 };
 

@@ -9,8 +9,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// useful for debugging
 #define DEBUG_PRINT_CODE
 #define DEBUG_TRACE_EXECUTION
+// useful for flushing out memory management bugs
+#define DEBUG_STRESS_GC
+#define DEBUG_LOG_GC
 
 // fixed size for local array
 #define UINT8_COUNT (UINT8_MAX + 1)

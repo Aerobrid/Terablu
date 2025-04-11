@@ -27,6 +27,9 @@ it’s easy to keep a running count of the number of bytes of allocated memory.
 reallocate(pointer, sizeof(type) * (oldCount), 0)
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+void markObject(Obj* object);
+void markValue(Value value);
+void collectGarbage();
 void freeObjects();
 
 #endif   // end include guard

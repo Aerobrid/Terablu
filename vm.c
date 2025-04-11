@@ -68,6 +68,12 @@ void initVM() {
     vm.stackCapacity = 0;           
     resetStack();                   // stack initially empty
     vm.objects = NULL;              // Nothing in LL since VM has just been created
+    vm.bytesAllocated = 0;          // when VM starts up, no memory has been allocated
+    vm.nextGC = 1024 * 1024;        // initial threshold is arbitrary, goal is to not trigger the first few GCs too quickly but also to not wait too long
+    
+    vm.grayCount = 0;               // gray stack is initially empty
+    vm.grayCapacity = 0;
+    vm.grayStack = NULL;
 
     initTable(&vm.globals);
     initTable(&vm.strings);         // string table initially empty
@@ -192,8 +198,8 @@ static bool isFalsey(Value value) {
 // to "add" 2 strings together
 // calculates length of result string based on 2 strings given -> allocate char array for result -> then copy the 2 strings in
 static void concatenate() {
-    ObjString* b = AS_STRING(pop());
-    ObjString* a = AS_STRING(pop());
+    ObjString* b = AS_STRING(peek(0));
+    ObjString* a = AS_STRING(peek(1));
   
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
@@ -202,6 +208,8 @@ static void concatenate() {
     chars[length] = '\0';
   
     ObjString* result = takeString(chars, length);
+    pop();
+    pop();
     push(OBJ_VAL(result));
 }
 
