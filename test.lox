@@ -1,10 +1,6 @@
-fun makeClosure() {
-  var local = "local";
-  fun closure() {
-    print local;
-  }
-  return closure;
-}
+class Pair {}
 
-var closure = makeClosure();
-closure();
+var pair = Pair();
+pair.first = 1;
+pair.second = 2;
+print pair.first + pair.second; // 3.
