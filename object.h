@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "table.h"
 #include "value.h"
 
 // extracts the object type tag from a given Value
@@ -11,17 +12,25 @@
 
 // checks if given Value is a function by calling isObjType()
 #define IS_FUNCTION(value)     isObjType(value, OBJ_FUNCTION)
+// to check if a value is an instance
+#define IS_INSTANCE(value)     isObjType(value, OBJ_INSTANCE)
 // to check if a value is a native function
 #define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
+// testing obj type to be a class
+#define IS_CLASS(value)        isObjType(value, OBJ_CLASS)
 // to check if value is a closure
 #define IS_CLOSURE(value)      isObjType(value, OBJ_CLOSURE)
 // to ensure that the Obj* pointer you have does point to the obj field of an actual ObjString
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 
+// casts value to an ObjClass pointer
+#define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
 // casts the value to ObjClosure pointer
 #define AS_CLOSURE(value)      ((ObjClosure*)AS_OBJ(value))
 // casts the value to ObjFunction pointer
 #define AS_FUNCTION(value)     ((ObjFunction*)AS_OBJ(value))
+// casts the value to ObjInstance pointer
+#define AS_INSTANCE(value)     ((ObjInstance*)AS_OBJ(value))
 
 #define AS_NATIVE(value) \
     (((ObjNative*)AS_OBJ(value))->function)
@@ -31,8 +40,10 @@
 
 // different type tags for each obj
 typedef enum {
+    OBJ_CLASS,
     OBJ_CLOSURE,
     OBJ_FUNCTION,
+    OBJ_INSTANCE,
     OBJ_NATIVE,
     OBJ_STRING,
     OBJ_UPVALUE
@@ -81,8 +92,22 @@ typedef struct {
     int upvalueCount;           // how many upvalues it has
 } ObjClosure;
 
+
+typedef struct {
+    Obj obj;                    // obj header
+    ObjString* name;            // to store the class's name (for things like stack traces)
+} ObjClass;
+
+typedef struct {
+    Obj obj;                    // object header
+    ObjClass* klass;            // pointer to the class it is an instance of
+    Table fields;               // Each instance stores its fields in a hash-table
+} ObjInstance;
+
+ObjClass* newClass(ObjString* name);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
+ObjInstance* newInstance(ObjClass* klass);
 ObjNative* newNative(NativeFn function);
 ObjString* takeString(char* chars, int length);
 ObjString* copyString(const char* chars, int length);

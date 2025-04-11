@@ -488,6 +488,20 @@ static void call(bool canAssign) {
 	emitBytes(OP_CALL, argCount);
 }
 
+// for parsing through after a dot for instances
+// load token’s lexeme (property name) into the constant table as a string so that the name is available at runtime
+static void dot(bool canAssign) {
+	consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+	uint8_t name = identifierConstant(&parser.previous);
+  
+	if (canAssign && match(TOKEN_EQUAL)) {
+		expression();
+		emitBytes(OP_SET_PROPERTY, name);
+	} else {
+	  	emitBytes(OP_GET_PROPERTY, name);
+	}
+}
+
 // compiles literal tokens like nil, true, false into bytecode instructions
 static void literal(bool canAssign) {
 	switch (parser.previous.type) {
@@ -581,7 +595,7 @@ ParseRule rules[] = {
 	[TOKEN_LEFT_BRACE]    = {NULL,     NULL,   PREC_NONE}, 
 	[TOKEN_RIGHT_BRACE]   = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_COMMA]         = {NULL,     NULL,   PREC_NONE},
-	[TOKEN_DOT]           = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_DOT]           = {NULL,     dot,    PREC_CALL},
 	[TOKEN_MINUS]         = {unary,    binary, PREC_TERM},
 	[TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
 	[TOKEN_PERCENT]       = {NULL,     binary, PREC_TERM},
@@ -706,6 +720,22 @@ static void function(FunctionType type) {
 		emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
 		emitByte(compiler.upvalues[i].index);
 	}
+}
+
+// compiles a class declaration
+// adds class name as string to constant table for runtime use
+// declares class name as a variable in current scope and defines it so that it can be used within class body (static & factory methods)
+// Emits bytecode instruction to create a class object with the given name
+static void classDeclaration() {
+	consume(TOKEN_IDENTIFIER, "Expect class name.");
+	uint8_t nameConstant = identifierConstant(&parser.previous);
+	declareVariable();
+  
+	emitBytes(OP_CLASS, nameConstant);
+	defineVariable(nameConstant);
+  
+	consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+	consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 // compiles function declaration
@@ -976,7 +1006,9 @@ static void synchronize() {
 // panic mode error recovery to minimize the number of cascaded compile errors that it reports,
 // compiler exits panic mode when it reaches a synchronization point
 static void declaration() {
-	if (match(TOKEN_FUN)) {
+	if (match(TOKEN_CLASS)) {
+		classDeclaration();
+	} else if (match(TOKEN_FUN)) {
 		funDeclaration();
 	} else if (match(TOKEN_VAR)) {
 		varDeclaration();

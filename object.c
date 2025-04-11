@@ -28,6 +28,14 @@ static Obj* allocateObject(size_t size, ObjType type) {
     return object;
 }
 
+// takes in the class’s name as a string and stores it, named klass to not conflict with class keyword in C++
+// everytime user declares new class, the VM will create a new ObjClass struct to represent it
+ObjClass* newClass(ObjString* name) {
+    ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+    klass->name = name; 
+    return klass;
+}
+
 // Creates a closure, which is a function bundled with references to its captured variables (upvalues)
 ObjClosure* newClosure(ObjFunction* function) {
     ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
@@ -51,6 +59,14 @@ ObjFunction* newFunction() {
     function->name = NULL;
     initChunk(&function->chunk);
     return function;
+}
+
+// store a reference to the instance's class, initialize field-table with an empty hash-table
+ObjInstance* newInstance(ObjClass* klass) {
+    ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+    instance->klass = klass;
+    initTable(&instance->fields);
+    return instance;
 }
 
 // takes a C function pointer to wrap in an ObjNative
@@ -124,6 +140,7 @@ ObjUpvalue* newUpvalue(Value* slot) {
 
 // to print function name
 // if user-defined the name is not NULL, else, it is for top-level code
+// An instance prints its name followed by “instance”
 static void printFunction(ObjFunction* function) {
     if (function->name == NULL) {
         printf("<script>");
@@ -135,11 +152,17 @@ static void printFunction(ObjFunction* function) {
 // for printing obj values
 void printObject(Value value) {
     switch (OBJ_TYPE(value)) {
+        case OBJ_CLASS:
+            printf("%s", AS_CLASS(value)->name->chars);
+            break;
         case OBJ_CLOSURE:
             printFunction(AS_CLOSURE(value)->function);
             break;
         case OBJ_FUNCTION:
             printFunction(AS_FUNCTION(value));
+            break;
+        case OBJ_INSTANCE:
+            printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
             break;
         case OBJ_NATIVE:
             printf("<native fn>");

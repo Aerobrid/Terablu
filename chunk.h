@@ -20,6 +20,8 @@ typedef enum {
     OP_SET_GLOBAL,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
+    OP_GET_PROPERTY,
+    OP_SET_PROPERTY,
     OP_DUP,
     OP_EQUAL,
     OP_GREATER,
@@ -41,6 +43,7 @@ typedef enum {
     OP_CONSTANT_LONG,
     OP_RETURN,
     OP_CONDITIONAL,
+    OP_CLASS,
 } OpCode;
 
 //  maps bytecode instructions back to source code lines

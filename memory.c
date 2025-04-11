@@ -81,6 +81,8 @@ static void markArray(ValueArray* array) {
 // OBJ_FUNCTION → Marks function name and all constants in its bytecode
 // OBJ_UPVALUE → Marks the closed-over value.
 // OBJ_STRING/OBJ_NATIVE → No child references; no action needed
+// OBJ_CLASS → Marks class name to keep the string alive
+// OBJ_INSTANCE → Marks the class instance belongs to, as well as its references (a field table)
 static void blackenObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
 	printf("%p blacken ", (void*)object);
@@ -89,6 +91,11 @@ static void blackenObject(Obj* object) {
 #endif
 
 	switch (object->type) {
+		case OBJ_CLASS: {
+			ObjClass* klass = (ObjClass*)object;
+			markObject((Obj*)klass->name);
+			break;
+		}
 		case OBJ_CLOSURE: {
 			ObjClosure* closure = (ObjClosure*)object;
 			markObject((Obj*)closure->function);
@@ -101,6 +108,12 @@ static void blackenObject(Obj* object) {
 			ObjFunction* function = (ObjFunction*)object;
 			markObject((Obj*)function->name);
 			markArray(&function->chunk.constants);
+			break;
+		}
+		case OBJ_INSTANCE: {
+			ObjInstance* instance = (ObjInstance*)object;
+			markObject((Obj*)instance->klass);
+			markTable(&instance->fields);
 			break;
 		}
 		case OBJ_UPVALUE:
@@ -116,14 +129,19 @@ static void blackenObject(Obj* object) {
 // free character array, then the ObjString
 // free objFunction if any function is allocated bits of memory, and free its respective chunk
 // VM also needs to know how to deallocate a nativefunction obj
-// when done with a closure, you free it's memory
-// Same thing with an upvalue, for when we do not need the local variable anymore.
+// when done with a closure, you free it's memory (and that array of Upvalues it points to)
+// Same thing for UpValue struct and class struct
+// free an object instance, along with its field-table
 static void freeObject(Obj* object) {
   #ifdef DEBUG_LOG_GC
   	printf("%p free type %d\n", (void*)object, object->type);
   #endif
 
 	switch (object->type) {
+		case OBJ_CLASS: {
+			FREE(ObjClass, object);
+			break;
+		} 
 		case OBJ_CLOSURE: {
 			ObjClosure* closure = (ObjClosure*)object;
 			FREE_ARRAY(ObjUpvalue*, closure->upvalues, closure->upvalueCount);
@@ -134,6 +152,12 @@ static void freeObject(Obj* object) {
 			ObjFunction* function = (ObjFunction*)object;
 			freeChunk(&function->chunk);
 			FREE(ObjFunction, object);
+			break;
+		}
+		case OBJ_INSTANCE: {
+			ObjInstance* instance = (ObjInstance*)object;
+			freeTable(&instance->fields);
+			FREE(ObjInstance, object);
 			break;
 		}
 		case OBJ_NATIVE:
