@@ -88,7 +88,8 @@ typedef struct Compiler {
 } Compiler;
 
 typedef struct ClassCompiler {
-	struct ClassCompiler* enclosing;
+	struct ClassCompiler* enclosing;	//  Pointer to the enclosing ClassCompiler (for nested classes)
+	bool hasSuperclass;					// whether class has a superclass (used for inheritance)	
 } ClassCompiler;
   
 Parser parser;
@@ -593,8 +594,44 @@ static void namedVariable(Token name, bool canAssign) {
 	}
 }
 
+// handles variable access or assignment when the compiler encounters a variable name in the source code
+// if canAssign True = this variable is allowed to appear on the left side of an assignment (=)
+// if canAssign False = this is a read-only reference (like inside an expression)
+// thing wrapper function for namedVariable
 static void variable(bool canAssign) {
 	namedVariable(parser.previous, canAssign);
+}
+
+// This function creates a fake or synthetic Token for internal use (compiler needs a stand-in identifier)
+static Token syntheticToken(const char* text) {
+	Token token;
+	token.start = text;
+	token.length = (int)strlen(text);
+	return token;
+}
+
+// when parser encounters a "super" keyword
+static void super_(bool canAssign) {
+	if (currentClass == NULL) {
+		error("Can't use 'super' outside of a class.");
+	} else if (!currentClass->hasSuperclass) {
+		error("Can't use 'super' in a class with no superclass.");
+	}
+	
+	consume(TOKEN_DOT, "Expect '.' after 'super'.");
+	consume(TOKEN_IDENTIFIER, "Expect superclass method name.");
+	uint8_t name = identifierConstant(&parser.previous);
+	
+	namedVariable(syntheticToken("this"), false);
+	if (match(TOKEN_LEFT_PAREN)) {
+		uint8_t argCount = argumentList();
+		namedVariable(syntheticToken("super"), false);
+		emitBytes(OP_SUPER_INVOKE, name);
+		emitByte(argCount);
+	} else {
+		namedVariable(syntheticToken("super"), false);
+		emitBytes(OP_GET_SUPER, name);
+	}
 }
 
 // when parser encounters a "this" keyword in prefix position
@@ -661,7 +698,7 @@ ParseRule rules[] = {
 	[TOKEN_OR]            = {NULL,     or_,    PREC_OR},
 	[TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
-	[TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_SUPER]         = {super_,   NULL,   PREC_NONE},
 	[TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
 	[TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
 	[TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
@@ -779,6 +816,8 @@ static void method() {
 // declares class name as a variable in current scope and defines it so that it can be used within class body (static & factory methods)
 // Emits bytecode instruction to create a class object with the given name
 // support for superclasses/inheritance
+// initialize classCompiler, and assume it is not a subclass
+// if we see a superclass clause, we know we are compiling a subclass
 static void classDeclaration() {
 	consume(TOKEN_IDENTIFIER, "Expect class name.");
 	Token className = parser.previous;
@@ -789,9 +828,27 @@ static void classDeclaration() {
 	defineVariable(nameConstant);
 
 	ClassCompiler classCompiler;
+	classCompiler.hasSuperclass = false;
 	classCompiler.enclosing = currentClass;
 	currentClass = &classCompiler;
 
+	if (match(TOKEN_LESS)) {
+		consume(TOKEN_IDENTIFIER, "Expect superclass name.");
+		variable(false);
+		
+		if (identifiersEqual(&className, &parser.previous)) {
+			error("A class can't inherit from itself.");
+		}
+
+		beginScope();
+		addLocal(syntheticToken("super"));
+		defineVariable(0);	
+	  
+		namedVariable(className, false);
+		emitByte(OP_INHERIT);
+		classCompiler.hasSuperclass = true;
+	}
+	
 	namedVariable(className, false);
 	consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
@@ -799,6 +856,10 @@ static void classDeclaration() {
 	}
 	consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 	emitByte(OP_POP);
+	
+	if (classCompiler.hasSuperclass) {
+		endScope();
+	}
 
 	currentClass = currentClass->enclosing;
 }
