@@ -4,6 +4,8 @@
 #include "object.h"
 #include "value.h"
 
+// prints header for the chunk and loops through it's bytecode
+// Advances the offset according to the size of each instruction (some take 1 byte, others more)
 void disassembleChunk(Chunk* chunk, const char* name) {
     printf("== %s ==\n", name);
 
@@ -13,6 +15,8 @@ void disassembleChunk(Chunk* chunk, const char* name) {
     }
 }
 
+// Handles instructions that use constants (OP_CONSTANT, OP_GET_GLOBAL, etc.)
+// Prints the instruction name, constant index, and its human-readable value
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
     uint8_t constant = chunk->code[offset + 1]; // 1 byte for the constant index
     printf("%-16s %4d '", name, constant);
@@ -22,6 +26,7 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
     return offset + 2;
 }
 
+// Handles instructions that involve a method call (OP_INVOKE)
 // read the two operands and then print out both the method name and the argument count
 static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
     uint8_t constant = chunk->code[offset + 1];
@@ -29,9 +34,10 @@ static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
     printf("%-16s (%d args) %4d '", name, argCount, constant);
     printValue(chunk->constants.values[constant]);
     printf("'\n");
-    return offset + 3;
+    return offset + 3;                                                                      // 1 byte for instruction, 2 for operands
 }
 
+// For constants that use 3 bytes for the index (like OP_CONSTANT_LONG)
 static int longConstantInstruction(const char* name, Chunk* chunk,int offset) {
     uint32_t constant = chunk->code[offset + 1] | (chunk->code[offset + 2] << 8) | (chunk->code[offset + 3] << 16);
     printf("%-16s %4d '", name, constant);
@@ -42,18 +48,24 @@ static int longConstantInstruction(const char* name, Chunk* chunk,int offset) {
     return offset + 4;
 }
 
+// For instructions that don’t have extra operands (OP_NIL, OP_TRUE, OP_RETURN, etc.)
+// prints the instruction name for debugging
 static int simpleInstruction(const char* name, int offset) {
     printf("%s\n", name);
     // simple instructions only take up a byte (so return offset + 1)
     return offset + 1;          
 }
 
+// For instructions that need a single uint8_t operand (like a slot index)
+// Prints the name and the operand
 static int byteInstruction(const char* name, Chunk* chunk, int offset) {
     uint8_t slot = chunk->code[offset + 1];
     printf("%-16s %4d\n", name, slot);
     return offset + 2; 
 }
 
+// For jump operations (OP_JUMP, OP_JUMP_IF_FALSE, OP_LOOP)
+// Prints where the jump goes based on the current offset and sign (forward or backward)
 static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset) {
     uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
     jump |= chunk->code[offset + 2];
@@ -62,6 +74,12 @@ static int jumpInstruction(const char* name, int sign, Chunk* chunk, int offset)
     return offset + 3;
 }
 
+// 1. Prints the current offset and line number
+// 2. Reads the opcode (uint8_t from chunk->code[offset])
+// 3. Uses a switch statement to match the opcode
+// 4. Calls the appropriate helper function based on the opcode
+// 5. Advances the offset correctly
+// If the opcode is unknown, it prints an error and advances by 1 byte
 int disassembleInstruction(Chunk* chunk, int offset) {
     printf("%04d ", offset);
     int line = getLine(chunk, offset);

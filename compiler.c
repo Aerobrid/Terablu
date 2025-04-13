@@ -778,6 +778,7 @@ static void method() {
 // adds class name as string to constant table for runtime use
 // declares class name as a variable in current scope and defines it so that it can be used within class body (static & factory methods)
 // Emits bytecode instruction to create a class object with the given name
+// support for superclasses/inheritance
 static void classDeclaration() {
 	consume(TOKEN_IDENTIFIER, "Expect class name.");
 	Token className = parser.previous;
@@ -790,7 +791,7 @@ static void classDeclaration() {
 	ClassCompiler classCompiler;
 	classCompiler.enclosing = currentClass;
 	currentClass = &classCompiler;
-  
+
 	namedVariable(className, false);
 	consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
 	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
