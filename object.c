@@ -28,11 +28,22 @@ static Obj* allocateObject(size_t size, ObjType type) {
     return object;
 }
 
+// stores the given closure and receiver
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
+    ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
 // takes in the class’s name as a string and stores it, named klass to not conflict with class keyword in C++
 // everytime user declares new class, the VM will create a new ObjClass struct to represent it
+// initializer starts out null for class
 ObjClass* newClass(ObjString* name) {
     ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
     klass->name = name; 
+    klass->initializer = NIL_VAL;
+    initTable(&klass->methods);
     return klass;
 }
 
@@ -152,6 +163,9 @@ static void printFunction(ObjFunction* function) {
 // for printing obj values
 void printObject(Value value) {
     switch (OBJ_TYPE(value)) {
+        case OBJ_BOUND_METHOD:
+            printFunction(AS_BOUND_METHOD(value)->method->function);
+            break;
         case OBJ_CLASS:
             printf("%s", AS_CLASS(value)->name->chars);
             break;

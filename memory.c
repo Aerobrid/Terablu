@@ -81,8 +81,9 @@ static void markArray(ValueArray* array) {
 // OBJ_FUNCTION → Marks function name and all constants in its bytecode
 // OBJ_UPVALUE → Marks the closed-over value.
 // OBJ_STRING/OBJ_NATIVE → No child references; no action needed
-// OBJ_CLASS → Marks class name to keep the string alive
+// OBJ_CLASS → Marks class name to keep the string alive as well as the class methods table
 // OBJ_INSTANCE → Marks the class instance belongs to, as well as its references (a field table)
+// OBJ_BOUND_METHOD → Marks the method and reciever
 static void blackenObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
 	printf("%p blacken ", (void*)object);
@@ -91,9 +92,16 @@ static void blackenObject(Obj* object) {
 #endif
 
 	switch (object->type) {
+		case OBJ_BOUND_METHOD: {
+			ObjBoundMethod* bound = (ObjBoundMethod*)object;
+			markValue(bound->receiver);
+			markObject((Obj*)bound->method);
+			break;
+		}
 		case OBJ_CLASS: {
 			ObjClass* klass = (ObjClass*)object;
 			markObject((Obj*)klass->name);
+			markTable(&klass->methods);
 			break;
 		}
 		case OBJ_CLOSURE: {
@@ -132,13 +140,19 @@ static void blackenObject(Obj* object) {
 // when done with a closure, you free it's memory (and that array of Upvalues it points to)
 // Same thing for UpValue struct and class struct
 // free an object instance, along with its field-table
+// Free the bound method when it is no longer needed
 static void freeObject(Obj* object) {
   #ifdef DEBUG_LOG_GC
   	printf("%p free type %d\n", (void*)object, object->type);
   #endif
 
 	switch (object->type) {
+		case OBJ_BOUND_METHOD:
+			FREE(ObjBoundMethod, object);
+			break;
 		case OBJ_CLASS: {
+			ObjClass* klass = (ObjClass*)object;
+			freeTable(&klass->methods);
 			FREE(ObjClass, object);
 			break;
 		} 
@@ -199,6 +213,7 @@ static void markRoots() {
 
 	markTable(&vm.globals);
 	markCompilerRoots();
+	markObject((Obj*)vm.initString);
 }
 
 // Recursively marks all objects referenced by the roots through walking the object graph either from white to gray or gray to black until grayStack empties

@@ -36,6 +36,7 @@ typedef struct {
     int stackCapacity;                          // Total capacity of VM stack
     Table globals;                              // hash-table storing global variables
     Table strings;                              // hash-table storing unique strings (for string interning)
+    ObjString* initString;                      // for initializer strings
     ObjUpvalue* openUpvalues;                   // A linked list of "open" upvalues — variables that are captured by closures, but still live on the stack
     
     size_t bytesAllocated;                      // tracks total # of bytes currently allocated by VM, used to monitor memory usage and trigger the GC

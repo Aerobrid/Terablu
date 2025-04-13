@@ -37,6 +37,7 @@ typedef enum {
     OP_JUMP_IF_FALSE,
     OP_LOOP,
     OP_CALL,
+    OP_INVOKE,
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_MODULUS,
@@ -44,6 +45,7 @@ typedef enum {
     OP_RETURN,
     OP_CONDITIONAL,
     OP_CLASS,
+    OP_METHOD
 } OpCode;
 
 //  maps bytecode instructions back to source code lines

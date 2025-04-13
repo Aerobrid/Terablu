@@ -71,6 +71,8 @@ typedef struct {
 // lets the compiler tell when it’s compiling top-level code versus the body of a function
 typedef enum {
 	TYPE_FUNCTION,
+	TYPE_INITIALIZER,
+	TYPE_METHOD,
 	TYPE_SCRIPT
 } FunctionType;
 
@@ -84,10 +86,16 @@ typedef struct Compiler {
 	Upvalue upvalues[UINT8_COUNT];
 	int scopeDepth;						// Tracks the current depth of nested blocks (used for scoping)
 } Compiler;
+
+typedef struct ClassCompiler {
+	struct ClassCompiler* enclosing;
+} ClassCompiler;
   
 Parser parser;
 
 Compiler* current = NULL;
+ClassCompiler* currentClass = NULL;
+
 
 Table stringConstants;
 
@@ -196,8 +204,17 @@ static int emitJump(uint8_t instruction) {
 
 // to print value we temporarily use OP_RETURN
 // Emits a RETURN bytecode instruction, signaling the end of a function
+// check the type to decide whether to insert the initializer-specific behavior
+// instead of pushing nil onto the stack before returning, we load slot zero, which contains the instance
+// also called when compiling a return statement without a value
+// correctly handles cases where the user does an early return inside the initializer
 static void emitReturn() {
-	emitByte(OP_NIL);
+	if (current->type == TYPE_INITIALIZER) {
+		emitBytes(OP_GET_LOCAL, 0);
+	} else {
+		emitByte(OP_NIL);
+	}
+
 	emitByte(OP_RETURN);
 }
 
@@ -248,8 +265,13 @@ static void initCompiler(Compiler* compiler, FunctionType type) {
 	Local* local = &current->locals[current->localCount++];
 	local->depth = 0;
 	local->isCaptured = false;
-	local->name.start = "";
-	local->name.length = 0;
+	if (type != TYPE_FUNCTION) {
+		local->name.start = "this";
+		local->name.length = 4;
+	} else {
+		local->name.start = "";
+		local->name.length = 0;
+	}
 }
 
 // Finalizes the compilation process and optionally prints the bytecode
@@ -497,6 +519,10 @@ static void dot(bool canAssign) {
 	if (canAssign && match(TOKEN_EQUAL)) {
 		expression();
 		emitBytes(OP_SET_PROPERTY, name);
+	} else if (match(TOKEN_LEFT_PAREN)) {
+		uint8_t argCount = argumentList();
+		emitBytes(OP_INVOKE, name);
+		emitByte(argCount);
 	} else {
 	  	emitBytes(OP_GET_PROPERTY, name);
 	}
@@ -571,6 +597,17 @@ static void variable(bool canAssign) {
 	namedVariable(parser.previous, canAssign);
 }
 
+// when parser encounters a "this" keyword in prefix position
+// using the this keyword outside of a class is forbidden
+static void this_(bool canAssign) {
+	if (currentClass == NULL) {
+		error("Can't use 'this' outside of a class.");
+		return;
+	}
+	
+	variable(false);
+} 
+
 // handles unary operator parsing
 static void unary(bool canAssign) {
 	TokenType operatorType = parser.previous.type;
@@ -625,7 +662,7 @@ ParseRule rules[] = {
 	[TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_SUPER]         = {NULL,     NULL,   PREC_NONE},
-	[TOKEN_THIS]          = {NULL,     NULL,   PREC_NONE},
+	[TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
 	[TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
 	[TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
 	[TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
@@ -686,7 +723,7 @@ static void function(FunctionType type) {
     // Begin a new scope for the function body.
     beginScope();
 
-    // Parse the parameter list inside parentheses `()`.
+    // Parse the parameter list inside parentheses ().
     consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
     if (!check(TOKEN_RIGHT_PAREN)) { // If there are parameters, parse them.
         do {
@@ -722,20 +759,47 @@ static void function(FunctionType type) {
 	}
 }
 
+// compiler adds the method name token’s lexeme to the constant table, getting back a table index
+// emit an OP_METHOD instruction with that index as the operand, which is the name
+static void method() {
+	consume(TOKEN_IDENTIFIER, "Expect method name.");
+	uint8_t constant = identifierConstant(&parser.previous);
+	
+	FunctionType type = TYPE_METHOD;
+	if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0) {
+	  	type = TYPE_INITIALIZER;
+	}
+  
+	function(type);
+	emitBytes(OP_METHOD, constant);
+}
+
 // compiles a class declaration
 // adds class name as string to constant table for runtime use
 // declares class name as a variable in current scope and defines it so that it can be used within class body (static & factory methods)
 // Emits bytecode instruction to create a class object with the given name
 static void classDeclaration() {
 	consume(TOKEN_IDENTIFIER, "Expect class name.");
+	Token className = parser.previous;
 	uint8_t nameConstant = identifierConstant(&parser.previous);
 	declareVariable();
   
 	emitBytes(OP_CLASS, nameConstant);
 	defineVariable(nameConstant);
+
+	ClassCompiler classCompiler;
+	classCompiler.enclosing = currentClass;
+	currentClass = &classCompiler;
   
+	namedVariable(className, false);
 	consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+	while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+		method();
+	}
 	consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+	emitByte(OP_POP);
+
+	currentClass = currentClass->enclosing;
 }
 
 // compiles function declaration
@@ -953,6 +1017,10 @@ static void returnStatement() {
 	if (match(TOKEN_SEMICOLON)) {
 	  	emitReturn();
 	} else {
+		if (current->type == TYPE_INITIALIZER) {
+			error("Can't return a value from an initializer.");
+		}
+	  
 		expression();
 		consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
 		emitByte(OP_RETURN);

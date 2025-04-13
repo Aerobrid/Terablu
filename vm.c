@@ -86,10 +86,12 @@ void initVM() {
     vm.grayCapacity = 0;
     vm.grayStack = NULL;
 
-    initTable(&vm.globals);
-    initTable(&vm.strings);         // string table initially empty
+    initTable(&vm.globals);                     // global var table initially empty
+    initTable(&vm.strings);                     // string table initially empty
+    vm.initString = NULL;
+    vm.initString = copyString("init", 4);      // create and intern string when VM boots up
 
-    defineNative("clock", clockNative);
+    defineNative("clock", clockNative);                                         // our native functions
     defineNative("deleteField", deleteFieldNative);
 
 }
@@ -98,6 +100,7 @@ void initVM() {
 void freeVM() {
     freeTable(&vm.globals);         // free global var hashtable from heap
     freeTable(&vm.strings);         // free string hashtable from heap
+    vm.initString = NULL;           // prevent dangling pointers 
     freeObjects();                  // to free every object from user program
     free(vm.stack);                 // free the value stack
     vm.stack = NULL;                // Prevents dangling pointers
@@ -145,13 +148,26 @@ static bool call(ObjClosure* closure, int argCount) {
     return true;
 }
 
-// Determines whether callee is a native or user-defined function
+// Determines whether the given Value (callee) is callable and executes it if possible.
+// Handles bound methods, classes (constructors), closures (user-defined functions), and native functions.
+// If the callee is not callable, reports a runtime error.
 static bool callValue(Value callee, int argCount) {
     if (IS_OBJ(callee)) {
         switch (OBJ_TYPE(callee)) {
+            case OBJ_BOUND_METHOD: {
+                ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
+                vm.stack[vm.stackCount - argCount - 1] = bound->receiver;
+                return call(bound->method, argCount);
+            }
             case OBJ_CLASS: {
                 ObjClass* klass = AS_CLASS(callee);
                 vm.stack[vm.stackCount - argCount - 1] = OBJ_VAL(newInstance(klass));
+                if (!IS_NIL(klass->initializer)) {                      
+                    return call(AS_CLOSURE(klass->initializer), argCount);
+                } else if (argCount != 0) {
+                    runtimeError("Expected 0 arguments but got %d.", argCount);
+                    return false;
+                }
                 return true;
             }
             case OBJ_CLOSURE:
@@ -169,6 +185,55 @@ static bool callValue(Value callee, int argCount) {
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+// look up the method by name in the class’s method table, if not found, report runtime error and exit
+// Otherwise, take the method’s closure and push a call to it onto the CallFrame stack
+static bool invokeFromClass(ObjClass* klass, ObjString* name, int argCount) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+    return call(AS_CLOSURE(method), argCount);
+}
+
+// grabs the reciever (method) off the stack
+// arguments passed to the method are above it on the stack, so we peek that many slots down
+// cast the object to an instance and invoke the method on it
+static bool invoke(ObjString* name, int argCount) {
+    Value receiver = peek(argCount);
+    
+    if (!IS_INSTANCE(receiver)) {
+        runtimeError("Only instances have methods.");
+        return false;
+    }
+
+    ObjInstance* instance = AS_INSTANCE(receiver);
+
+    Value value;
+    if (tableGet(&instance->fields, name, &value)) {
+        vm.stack[vm.stackCount - argCount - 1] = value;
+        return callValue(value, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
+// look for a method with the given name in the class’s method table
+// if not found report runtime error, otherwise, take the method and wrap it in a new ObjBoundMethod
+// grab the receiver at top of stack, then pop instance (receiver) and replace top of stack with the bound method
+static bool bindMethod(ObjClass* klass, ObjString* name) {
+    Value method;
+    if (!tableGet(&klass->methods, name, &method)) {
+        runtimeError("Undefined property '%s'.", name->chars);
+        return false;
+    }
+  
+    ObjBoundMethod* bound = newBoundMethod(peek(0), AS_CLOSURE(method));
+    pop();
+    push(OBJ_VAL(bound));
+    return true;
 }
 
 // Captures a local variable from the stack and wraps it in an ObjUpvalue
@@ -206,6 +271,16 @@ static void closeUpvalues(Value* last) {
         upvalue->location = &upvalue->closed;
         vm.openUpvalues = upvalue->next;
     }
+}
+
+// gets a method and adds it to its respective class's method table
+// When a method is defined, if it's the initializer, then we also store it in that field
+static void defineMethod(ObjString* name) {
+    Value method = peek(0);
+    ObjClass* klass = AS_CLASS(peek(1));
+    tableSet(&klass->methods, name, method);
+    if (name == vm.initString) klass->initializer = method;
+    pop();
 }
 
 // determine whether given value is falsey
@@ -355,8 +430,10 @@ static InterpretResult run() {
                     break;
                 }
 
-                runtimeError("Undefined property '%s'.", name->chars);
-                return INTERPRET_RUNTIME_ERROR;
+                if (!bindMethod(instance->klass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
             }
             case OP_SET_PROPERTY: {
                 if (!IS_INSTANCE(peek(1))) {
@@ -434,6 +511,15 @@ static InterpretResult run() {
                 frame = &vm.frames[vm.frameCount - 1];
                 break;
             } 
+            case OP_INVOKE: {
+                ObjString* method = READ_STRING();
+                int argCount = READ_BYTE();
+                if (!invoke(method, argCount)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frameCount - 1];
+                break;
+            }
             case OP_CLOSURE: {
                 ObjFunction* function = AS_FUNCTION(READ_CONSTANT());
                 ObjClosure* closure = newClosure(function);
@@ -470,6 +556,9 @@ static InterpretResult run() {
             case OP_CLASS:
                 push(OBJ_VAL(newClass(READ_STRING())));
                 break; 
+            case OP_METHOD:
+                defineMethod(READ_STRING());
+                break;
         }
     }
     

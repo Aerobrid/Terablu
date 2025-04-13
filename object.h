@@ -16,6 +16,8 @@
 #define IS_INSTANCE(value)     isObjType(value, OBJ_INSTANCE)
 // to check if a value is a native function
 #define IS_NATIVE(value)       isObjType(value, OBJ_NATIVE)
+// to check if a value is a bound method
+#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
 // testing obj type to be a class
 #define IS_CLASS(value)        isObjType(value, OBJ_CLASS)
 // to check if value is a closure
@@ -23,6 +25,8 @@
 // to ensure that the Obj* pointer you have does point to the obj field of an actual ObjString
 #define IS_STRING(value)       isObjType(value, OBJ_STRING)
 
+// casts value to an ObjBoundMethod pointer
+#define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 // casts value to an ObjClass pointer
 #define AS_CLASS(value)        ((ObjClass*)AS_OBJ(value))
 // casts the value to ObjClosure pointer
@@ -40,6 +44,7 @@
 
 // different type tags for each obj
 typedef enum {
+    OBJ_BOUND_METHOD,
     OBJ_CLASS,
     OBJ_CLOSURE,
     OBJ_FUNCTION,
@@ -96,6 +101,8 @@ typedef struct {
 typedef struct {
     Obj obj;                    // obj header
     ObjString* name;            // to store the class's name (for things like stack traces)
+    Value initializer;          // cache the initializer directly in the ObjClass to avoid the hash table lookup (optimization)
+    Table methods;              // each class stores a hash-table of methods (keys: method names, values: an ObjClosure for the body of the method)
 } ObjClass;
 
 typedef struct {
@@ -104,6 +111,14 @@ typedef struct {
     Table fields;               // Each instance stores its fields in a hash-table
 } ObjInstance;
 
+// a bound method is a method that is tied to a specific instance of a class
+typedef struct {
+    Obj obj;                    // obj header
+    Value receiver;             // the instance the method is bound to
+    ObjClosure* method;         // The method (function) itself, stored as a closure
+} ObjBoundMethod;
+  
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
 ObjClass* newClass(ObjString* name);
 ObjClosure* newClosure(ObjFunction* function);
 ObjFunction* newFunction();
