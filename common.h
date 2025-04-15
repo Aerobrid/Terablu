@@ -3,12 +3,13 @@
 #ifndef clox_common_h  // If "CLOX_COMMON_H" (it can be another name) is not defined...
 #define clox_common_h  // Define CLOX_COMMON_H
 
-
 // Standard library headers the interpreter will use
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
+// optimization for cutting down the size of the Value type
+#define NAN_BOXING
 // useful for debugging
 #define DEBUG_PRINT_CODE
 #define DEBUG_TRACE_EXECUTION
